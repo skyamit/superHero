@@ -62,12 +62,10 @@ var heros = document.getElementById("heros");
 var search = document.getElementById("search");
 var submit = document.getElementById("submit");
 var body = document.getElementById("body");
-
+var bookmarked_heros = document.getElementById("bookmarked_heros");
+var statuss = 0; // 0 - normal , 1 - search, 2 - bookmark
 
 var ts = CryptoJS.MD5(Date.now().toString());
-
-
-
 var publicKey = "4e5eab3e766f2717bd00c5721f841689";
 var privateKey = "63e6e43c0eb00694b0782ca23fe3f5315374fcbe";
 var hash = CryptoJS.MD5(ts + privateKey + publicKey);
@@ -75,34 +73,29 @@ var load = true;
 
 var offset = 100;
 var limit = 100;
-var charactersApi = "https://gateway.marvel.com:443/v1/public/characters?limit=100&offset=0&ts="+ts+"&apikey="+publicKey+"&hash="+hash;
-var res2 = await fetch(charactersApi).then(response => response.json());
 
-var data2 = res2.data.results;
-for( var d of data2) {
-    var url = d.urls;
-    var thumbnail = d.thumbnail;
-    var img = thumbnail.path + '.' + thumbnail.extension;
-    if(img.includes("image_not_available") || img.includes("4c002e0305708")){
-        continue;
+(async () => {
+    statuss = 1;
+    var charactersApi = "https://gateway.marvel.com:443/v1/public/characters?limit=100&offset=0&ts="+ts+"&apikey="+publicKey+"&hash="+hash;
+    var res2 = await fetch(charactersApi).then(response => response.json());
+
+    var data2 = res2.data.results;
+    for( var d of data2) {
+        var url = d.urls;
+        var thumbnail = d.thumbnail;
+        var img = thumbnail.path + '.' + thumbnail.extension;
+        if(img.includes("image_not_available") || img.includes("4c002e0305708")){
+            continue;
+        }
+        var title = d.name;
+        heros.innerHTML += getHtml(img, title, d.id, url[0].url);
     }
-    var title = d.name;
-    heros.innerHTML += '<div class="card details" style="width: 20rem; padding:10px">' + 
-        '<img class="card-img-top" src="'+img+'" alt="Card image cap"> '+
-        '<div class="card-body"> '+
-        '<h5 class="card-title">'+title+'</h5> '+
-        '</div> '+
-        '<ul class="list-group list-group-flush">'+
-        '<li class="list-group-item" name="bookmark" id="'+d.id+'">Bookmark!</li>'+
-        '<li class="list-group-item"><a href='+url[0].url+' target="_blank" >Know More</a></li>'+
-        '</ul>'+
-    '</div>';
-}
 
+})();
 
 submit.onclick = async function(e){
+    statuss = 2;
     e.preventDefault();
-    this.def
     heros.innerHTML = "";
     var name = search.value;
     var namewise = "https://gateway.marvel.com:443/v1/public/characters?nameStartsWith="+name+"&ts="+ts+"&apikey="+publicKey+"&hash="+hash;
@@ -124,26 +117,51 @@ submit.onclick = async function(e){
             }
             var title = d.name;
 
-            heros.innerHTML += '<div class="card details" style="width: 20rem; padding:10px">' + 
-                '<img class="card-img-top" src="'+img+'" alt="Card image cap"> '+
-                '<div class="card-body"> '+
-                '<h5 class="card-title">'+title+'</h5> '+
-                '</div> '+
-                '<ul class="list-group list-group-flush">'+
-                '<li class="list-group-item" name="bookmark" id="'+d.id+'">Bookmark!</li>'+
-                '<li class="list-group-item"><a href='+url[0].url+' target="_blank" >Know More</a></li>'+
-                '</ul>'+
-            '</div>';
+            heros.innerHTML += getHtml(img, title, d.id, url[0].url);
         }
     }
 }
 
+bookmarked_heros.onclick = async function(){
+    statuss = 3;
+    var array = JSON.parse(localStorage.getItem("bookmarked_hero"));
+
+    heros.innerHTML = "";
+    if(array.length == 0){
+        heros.innerHTML += "<h3>No Bookmarked heros!!</h3>";
+        return;
+    }
+    new Toast("Loading... ",ToastType.Succes,1000);
+    for( var id of array) {
+        var charactersApi = "https://gateway.marvel.com:443/v1/public/characters/"+id+"?"+ts+"&apikey="+publicKey+"&hash="+hash;
+        var res2 = await fetch(charactersApi).then(response => response.json());
+        var data2 = res2.data.results;
+        var d = data2[0];
+        var url = d.urls;
+        var thumbnail = d.thumbnail;
+        var img = thumbnail.path + '.' + thumbnail.extension;
+        if(img.includes("image_not_available") || img.includes("4c002e0305708")){
+            continue;
+        }
+        var title = d.name;
+        heros.innerHTML += '<div class="card details" style="width: 20rem; padding:10px">' + 
+            '<img class="card-img-top" src="'+img+'" alt="Card image cap"> '+
+            '<div class="card-body"> '+
+            '<h5 class="card-title">'+title+'</h5> '+
+            '</div> '+
+            '<ul class="list-group list-group-flush">'+
+            '<li class="list-group-item" name="remove_bookmark" id="'+d.id+'">Remove Bookmark!</li>'+
+            '<li class="list-group-item"><a href='+url[0].url+' target="_blank" >Know More</a></li>'+
+            '</ul>'+
+        '</div>';
+    }
+}
 
 document.onscroll = async function() {
     if(!load)
         return ;
     
-    if(search.value !== '')
+    if(statuss != 1)
         return;
 
     if(document.documentElement.scrollTop > document.documentElement.scrollHeight - 2000)
@@ -162,16 +180,7 @@ document.onscroll = async function() {
                 continue;
             }
             var title = d.name;
-            heros.innerHTML += '<div class="card details" style="width: 20rem; padding:10px">' + 
-                '<img class="card-img-top" src="'+img+'" alt="Card image cap"> '+
-                '<div class="card-body"> '+
-                '<h5 class="card-title">'+title+'</h5> '+
-                '</div> '+
-                '<ul class="list-group list-group-flush">'+
-                '<li class="list-group-item" name="bookmark" id="'+d.id+'">Bookmark!</li>'+
-                '<li class="list-group-item"><a href='+url[0].url+' target="_blank" >Know More</a></li>'+
-                '</ul>'+
-            '</div>';
+            heros.innerHTML += getHtml(img, title, d.id, url[0].url);
             load = true;
         }
         offset += 100;
@@ -184,18 +193,45 @@ heros.addEventListener("click",function(e) {
     if (target.getAttribute("name") === "bookmark"){
         new Toast("Bookmarked... ",ToastType.Succes,3000);
         var id = target.getAttribute("id");
+        var array = [];
         if(localStorage.getItem('bookmarked_hero') === null) {
-            var array = [];
-            array.push(id);
-            localStorage.setItem("bookmarked_hero", JSON.stringify(array))
+            array = [];
         }
         else{
-            var array = JSON.parse(localStorage.getItem("bookmarked_hero"));
-            console.log(typeof(arr));
-            array.push(id);
-            localStorage.setItem("bookmarked_hero", JSON.stringify(array))
+            array = JSON.parse(localStorage.getItem("bookmarked_hero"));
         }
-
-        console.log(localStorage.getItem('bookmarked_hero'));
+        array.push(id);
+        localStorage.setItem("bookmarked_hero", JSON.stringify(array))
+    }
+    if (target.getAttribute("name") === "remove_bookmark"){
+        new Toast("Removing.. ",ToastType.Succes,1000);
+        var id = target.getAttribute("id");
+        
+        var array = JSON.parse(localStorage.getItem("bookmarked_hero"));
+        removeElement(array, id);
+        localStorage.setItem("bookmarked_hero", JSON.stringify(array))
+        bookmarked_heros.click();
     }
 });
+
+
+
+function getHtml(img, title, id, url) {
+    return '<div class="card details" style="width: 20rem; padding:10px">' + 
+        '<img class="card-img-top" src="'+img+'" alt="Card image cap"> '+
+        '<div class="card-body"> '+
+        '<h5 class="card-title">'+title+'</h5> '+
+        '</div> '+
+        '<ul class="list-group list-group-flush">'+
+        '<li class="list-group-item" name="bookmark" id="'+id+'">Bookmark!</li>'+
+        '<li class="list-group-item"><a href='+url+' target="_blank" >Know More</a></li>'+
+        '</ul>'+
+    '</div>';
+}
+
+const removeElement = (arr, element) => {
+    if(arr.indexOf(element) !== -1){
+        arr.splice(arr.indexOf(element), 1);
+        return ;
+    };
+};
